@@ -1,0 +1,180 @@
+
+function [image0, imagen, imagep Phase] = osh(baseFileName,filename,mysavedtrain,mysavedtest)
+addpath('lib');
+%%Reading input bitmap files
+
+N = 32;
+
+fullSavedFileName = fullfile(mysavedtest, baseFileName);
+
+%I=imread('pirate256.bmp','bmp');
+[I, Phase] = fresneldiffraction(N,filename);
+r = convertintensity(I(:,:,1), Phase, N);
+g = convertintensity(I(:,:,2), Phase, N);
+b = convertintensity(I(:,:,3), Phase, N);
+
+% g = zeros(32);
+% b = zeros(32);
+
+rgbImage = cat(3, r, g, b);
+imwrite(,'test.png');%fullSavedFileName);
+
+% figure
+% %colormap(gray(255))
+% image(rgbImage)
+% title('Postive Real image reconstruction of complex FZP hologram,Hc+')
+% axis off
+
+end
+
+
+
+function imagep = convertintensity(I0,Phase, N) 
+
+I0 = double(I0.*1);lamda = 632e-9;
+
+ROWS=N;
+COLS=N;
+
+Phase = Phase.*1;
+pixelsize=3.8e-6; %(6e-6); % 2um pixel size
+U0=sqrt(I0*1000).*exp(1i.*Phase);
+dz=0.00001;   % defocus distance 10um
+Uz  =  Numerical_Propagation(U0,dz,pixelsize,lamda,'Fresnel');
+I=Uz.*conj(Uz);
+U_z  = Numerical_Propagation(U0,-dz,pixelsize,lamda,'Fresnel');
+I_z=Uz.*conj(Uz);
+
+% I=I(:,:,1);
+% figure(1)%displaying input
+% colormap(gray(255));
+% image(I)
+% title('Original image')
+% axis off
+
+
+%pause
+%%Creating OTFosh with SIGMA=z/2*k0 (Eq.(3.5-1a))
+
+sigma=2.0; %not necessary to scale
+%kx,ky are spatial frequencies
+z = 1;
+ky=-12.8;
+for r=1:COLS
+kx=-12.8;
+for c=1:ROWS
+%OTFosh(r,c)=exp(-j*sigma*kx*kx-j*sigma*ky*ky);
+OTFosh(r,c)=exp(1i*pi*lamda -z*(j*sigma*kx*kx-j*sigma*ky*ky));
+kx=kx+.1;
+end
+ky=ky+.1;
+end
+
+z_r_n = 0.99;
+z_r = 1;
+z_r_p = 1.01;
+ky=-12.8;
+for r=1:COLS
+kx=-12.8;
+for c=1:ROWS
+%OTFosh(r,c)=exp(-j*sigma*kx*kx-j*sigma*ky*ky);
+OTFosh_recon_n(r,c)=exp(1i*pi*lamda -z_r_n*(j*sigma*kx*kx-j*sigma*ky*ky));
+OTFosh_recon(r,c)=exp(1i*pi*lamda -z_r*(j*sigma*kx*kx-j*sigma*ky*ky));
+OTFosh_recon_p(r,c)=exp(1i*pi*lamda -z_r_p*(j*sigma*kx*kx-j*sigma*ky*ky));
+kx=kx+.1;
+end
+ky=ky+.1;
+end
+
+
+%largest = maxk(I,1);
+%Inormalized = normalize(I);
+Irescaled = rescale(I);
+
+% figure
+% colormap(gray(255));
+% %Displaying the real part becomes sine-FZP hologram
+% % Eq. (3.5-8a)
+% Itodisplay = 256*real(Irescaled)
+% image(Itodisplay);
+% title('under sampled sin hologram')
+% axis off
+
+
+max1=max(OTFosh);
+max2=max(max1);
+scale=1.0/max2;
+OTFosh=OTFosh.*scale;
+%Recording hologram
+% Taking Fourier transform of I
+FI=fft2(I);
+FI=fftshift(FI);
+max1=max(FI);
+max2=max(max1);
+scale=1.0/max2;
+FI=FI.*scale;
+% FH is the recorded hologram in Fourier domain
+FH=FI.*OTFosh;
+H=ifft2(FH);
+max1=max(H);
+max2=max(max1);
+scale=1.0/max2;
+
+H=H.*scale;
+
+[x_ori,y_ori,z_ori] = size(H);
+[pic_usampled, ori_len] = undersample(H,2);   % 2 times undersampling.  
+%intepo_pic = picinterpolated(pic_usampled, ori_len)
+intepo_pic = imresize(pic_usampled, [N N]);
+imagedata = abs((real(256*H)));
+
+
+FRCOMPLEXH=fft2(real(H)+j*imag(H)).*conj(OTFosh_recon_p);
+RCOMPLEX=ifft2(FRCOMPLEXH);
+imagep = 1.4*256*abs(RCOMPLEX)/max(max(abs(RCOMPLEX)));
+
+
+
+
+
+% figure
+% colormap(gray(255));
+% %Displaying the real part becomes sine-FZP hologram
+% % Eq. (3.5-8a)
+% image(int16(I0));
+% title('Sine-FZP hologram')
+% axis off
+
+
+% 
+% 
+% figure
+% colormap(gray(255));
+% %Displaying the real part becomes sine-FZP hologram
+% % Eq. (3.5-8a)
+% Hrescaled = 256*rescale(real(H))
+% image(Hrescaled);
+% title('under sampled sin hologram')
+% axis off
+
+
+end
+
+function [pic_undersampled,ori_len] = undersample(pic1,a)
+
+[x,y,z] = size(pic1);
+
+if(x<=y)
+    pic1 = pic1(1:x,1:x);
+    ori_len = x;
+else 
+    pic1 = pic1(1:y,1:y);
+    ori_len = y;
+end 
+
+if(z==1)
+    pic_undersampled = pic1([1:a:x],[1:a:y]);
+else
+    pic_undersampled = pic1([1:a:x],[1:a:y],[1:1:z]);
+end
+end

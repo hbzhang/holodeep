@@ -1,0 +1,12 @@
+ww = imread('../../tensorflow-cifar-10/data_set/raw/10043.png')
+
+ww(:,:,1)
+ww(:,:,2)
+ww(:,:,3)
+
+figure 
+colormap(gray(255));
+image(ww) 
+title('Original image')
+axis off
+

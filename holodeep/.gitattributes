@@ -1,0 +1,2 @@
+*hkl filter=lfs diff=lfs merge=lfs -text
+*.hkl filter=lfs diff=lfs merge=lfs -text
